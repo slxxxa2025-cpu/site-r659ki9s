@@ -1,0 +1,795 @@
+```html
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة المختبرات الطبية</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts (Tajawal for Arabic) -->
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Tajawal', 'sans-serif'] },
+                    colors: {
+                        skyLight: '#e0f2fe',
+                        skyMid: '#bae6fd',
+                        blueDark: '#1e3a8a',
+                        bluePrimary: '#2563eb'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #ffffff; }
+        .hide { display: none !important; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #93c5fd; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #60a5fa; }
+    </style>
+</head>
+<body class="text-slate-800 antialiased h-screen flex flex-col relative">
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center transition-opacity duration-500">
+        <i class="fa-solid fa-spinner fa-spin text-5xl text-bluePrimary mb-4"></i>
+        <h2 class="text-xl font-bold text-blueDark">جاري الاتصال بقاعدة البيانات...</h2>
+        <p class="text-sm text-gray-500 mt-2">يرجى الانتظار، يتم جلب ملفاتك المحفوظة</p>
+    </div>
+
+    <!-- Header -->
+    <header class="bg-skyLight border-b border-skyMid p-4 shadow-sm flex justify-between items-center z-10 sticky top-0">
+        <div class="flex items-center gap-3 cursor-pointer" onclick="window.goHome()">
+            <div class="bg-bluePrimary text-white p-2 rounded-lg">
+                <i class="fa-solid fa-microscope text-xl"></i>
+            </div>
+            <h1 class="text-xl md:text-2xl font-bold text-blueDark">نظام المختبرات</h1>
+        </div>
+        <div id="header-actions" class="flex gap-2">
+            <button onclick="window.openModal('labModal')" class="bg-bluePrimary hover:bg-blue-700 text-white px-3 py-2 md:px-4 rounded-lg shadow transition font-medium text-sm md:text-base flex items-center">
+                <i class="fa-solid fa-plus ml-1 md:ml-2"></i> <span class="hidden md:inline">إضافة مختبر</span><span class="md:hidden">مختبر</span>
+            </button>
+            <button onclick="window.openModal('empModal')" class="bg-white hover:bg-sky-50 text-bluePrimary border border-bluePrimary px-3 py-2 md:px-4 rounded-lg shadow transition font-medium text-sm md:text-base flex items-center">
+                <i class="fa-solid fa-user-plus ml-1 md:ml-2"></i> <span class="hidden md:inline">إضافة موظف</span><span class="md:hidden">موظف</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-y-auto p-4 md:p-6 pb-24">
+        
+        <!-- ================= DASHBOARD VIEW ================= -->
+        <div id="view-dashboard" class="space-y-6">
+            
+            <!-- Lists Section -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Labs List -->
+                <div class="bg-skyLight p-4 rounded-2xl border border-skyMid flex flex-col h-[300px]">
+                    <h2 class="text-xl font-bold text-blueDark mb-4 border-b border-white pb-2 sticky top-0 bg-skyLight">المختبرات الحالية</h2>
+                    <div id="labs-list" class="space-y-3 overflow-y-auto flex-1 pr-2"></div>
+                </div>
+
+                <!-- Employees List -->
+                <div class="bg-skyLight p-4 rounded-2xl border border-skyMid flex flex-col h-[300px]">
+                    <h2 class="text-xl font-bold text-blueDark mb-4 border-b border-white pb-2 sticky top-0 bg-skyLight">كادر الموظفين</h2>
+                    <div id="emps-list" class="space-y-3 overflow-y-auto flex-1 pr-2"></div>
+                </div>
+            </div>
+
+            <!-- General Statistics -->
+            <div class="bg-blueDark text-white p-6 rounded-2xl shadow-lg mt-6">
+                <h2 class="text-xl font-bold mb-4 border-b border-blue-800 pb-2"><i class="fa-solid fa-chart-pie ml-2 text-skyLight"></i>إحصائيات عامة</h2>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                    <div class="bg-blue-900/50 p-4 rounded-xl border border-blue-800">
+                        <p class="text-sky-200 text-sm mb-1">المختبرات</p>
+                        <p id="stat-lab-count" class="text-3xl font-bold">0</p>
+                    </div>
+                    <div class="bg-blue-900/50 p-4 rounded-xl border border-blue-800">
+                        <p class="text-sky-200 text-sm mb-1">الموظفين</p>
+                        <p id="stat-emp-count" class="text-3xl font-bold">0</p>
+                    </div>
+                    <div class="bg-blue-900/50 p-4 rounded-xl border border-blue-800">
+                        <p class="text-sky-200 text-sm mb-1">إجمالي الدفع (أخضر)</p>
+                        <p id="stat-total-deposit" class="text-2xl font-bold text-green-400">0</p>
+                    </div>
+                    <div class="bg-blue-900/50 p-4 rounded-xl border border-blue-800">
+                        <p class="text-sky-200 text-sm mb-1">إجمالي السحب (أحمر)</p>
+                        <p id="stat-total-withdraw" class="text-2xl font-bold text-red-400">0</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="mt-8 space-y-6">
+                <h2 class="text-2xl font-bold text-blueDark border-b-2 border-skyMid pb-2 inline-block"><i class="fa-solid fa-chart-line ml-2"></i>التقارير البيانية</h2>
+                
+                <!-- Cash Flow Chart (Deposit/Withdrawal) -->
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-sky-100">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-3">
+                        <h3 class="text-lg font-bold text-blueDark"><i class="fa-solid fa-money-bill-transfer ml-2 text-sky-500"></i>مخطط حركة الأموال (دفع / سحب)</h3>
+                        <button onclick="window.openModal('transModal')" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg shadow transition font-bold text-sm flex items-center w-full md:w-auto justify-center">
+                            <i class="fa-solid fa-plus ml-2"></i>إضافة حركة مالية
+                        </button>
+                    </div>
+                    <div class="relative h-72 w-full">
+                        <canvas id="cashFlowChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-sky-100">
+                        <h3 class="text-lg font-bold text-blueDark mb-4"><i class="fa-solid fa-chart-column ml-2 text-sky-500"></i>الأرباح اليومية (الإجمالي)</h3>
+                        <div class="relative h-64 w-full">
+                            <canvas id="mainDailyChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-sky-100">
+                        <h3 class="text-lg font-bold text-blueDark mb-4"><i class="fa-solid fa-chart-bar ml-2 text-sky-500"></i>الأرباح الشهرية (الإجمالي)</h3>
+                        <div class="relative h-64 w-full">
+                            <canvas id="mainMonthlyChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ================= LAB DETAILS VIEW ================= -->
+        <div id="view-lab" class="hide space-y-6">
+            <button onclick="window.goHome()" class="text-bluePrimary hover:underline mb-2 inline-block"><i class="fa-solid fa-arrow-right ml-1"></i> رجوع للرئيسية</button>
+            
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-sky-200">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                    <div>
+                        <h2 id="lab-detail-name" class="text-3xl font-bold text-blueDark mb-1">-</h2>
+                        <p id="lab-detail-loc" class="text-gray-500"><i class="fa-solid fa-location-dot ml-1"></i>-</p>
+                    </div>
+                    <div class="flex gap-3 bg-skyLight p-3 rounded-xl w-full md:w-auto">
+                        <div class="flex flex-col flex-1">
+                            <label class="text-xs text-gray-600 mb-1">حالة المختبر</label>
+                            <select id="lab-status-select" onchange="window.updateLabSetting()" class="border border-sky-300 rounded p-1 bg-white outline-none cursor-pointer font-bold text-sm">
+                                <option value="مفتوح">مفتوح</option>
+                                <option value="مغلق">مغلق</option>
+                            </select>
+                        </div>
+                        <div class="flex flex-col flex-1">
+                            <label class="text-xs text-gray-600 mb-1">وقت الدوام</label>
+                            <select id="lab-time-select" onchange="window.updateLabSetting()" class="border border-sky-300 rounded p-1 bg-white outline-none cursor-pointer font-bold text-sm">
+                                <option value="ظهر">ظهر</option>
+                                <option value="عصر">عصر</option>
+                                <option value="ظهر وعصر">ظهر وعصر</option>
+                                <option value="عطلة">مغلق (عطلة)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lab Specific Charts -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8 border-t border-sky-100 pt-6">
+                    <div>
+                        <h3 class="text-lg font-bold text-blueDark mb-4">أرباح المختبر اليومية</h3>
+                        <div class="relative h-64 w-full">
+                            <canvas id="labDailyChart"></canvas>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-blueDark mb-4">أرباح المختبر الشهرية</h3>
+                        <div class="relative h-64 w-full">
+                            <canvas id="labMonthlyChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= EMPLOYEE DETAILS VIEW ================= -->
+        <div id="view-emp" class="hide space-y-6">
+            <button onclick="window.goHome()" class="text-bluePrimary hover:underline mb-2 inline-block"><i class="fa-solid fa-arrow-right ml-1"></i> رجوع للرئيسية</button>
+            
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-sky-200">
+                <div class="flex items-center gap-4 mb-6 pb-4 border-b border-sky-100">
+                    <div class="bg-skyLight w-16 h-16 rounded-full flex items-center justify-center text-bluePrimary text-3xl">
+                        <i class="fa-solid fa-user-tie"></i>
+                    </div>
+                    <div>
+                        <h2 id="emp-detail-name" class="text-3xl font-bold text-blueDark mb-1">-</h2>
+                        <div class="flex flex-col sm:flex-row sm:gap-4 text-sm mt-2">
+                            <p class="text-gray-600 bg-gray-50 px-2 py-1 rounded">الأساسي: <span id="emp-detail-base" class="font-bold text-blue-600">0</span></p>
+                            <p class="text-gray-600 bg-green-50 px-2 py-1 rounded mt-1 sm:mt-0">الصافي: <span id="emp-detail-net" class="font-bold text-green-600">0</span></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Permanent Adjustments -->
+                    <div class="bg-sky-50 p-4 rounded-xl border border-sky-200 col-span-1 md:col-span-2">
+                        <h3 class="font-bold text-blueDark mb-4"><i class="fa-solid fa-scale-balanced ml-2"></i>تعديل الراتب (دائمي)</h3>
+                        <div class="flex flex-col sm:flex-row gap-4">
+                            <div class="flex-1">
+                                <label class="block text-sm text-gray-600 mb-1">مبلغ الزيادة</label>
+                                <div class="flex gap-2">
+                                    <input type="number" id="emp-inc-val" class="w-full border border-sky-300 p-2 rounded outline-none focus:border-bluePrimary">
+                                    <button onclick="window.adjustSalary('increase')" class="bg-green-500 hover:bg-green-600 text-white px-4 rounded transition shrink-0">زيادة</button>
+                                </div>
+                            </div>
+                            <div class="flex-1">
+                                <label class="block text-sm text-gray-600 mb-1">مبلغ النقصان</label>
+                                <div class="flex gap-2">
+                                    <input type="number" id="emp-dec-val" class="w-full border border-sky-300 p-2 rounded outline-none focus:border-bluePrimary">
+                                    <button onclick="window.adjustSalary('decrease')" class="bg-red-500 hover:bg-red-600 text-white px-4 rounded transition shrink-0">نقصان</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Temporary Deduction -->
+                    <div class="bg-orange-50 p-4 rounded-xl border border-orange-200">
+                        <h3 class="font-bold text-orange-800 mb-4"><i class="fa-solid fa-scissors ml-2"></i>خصم مؤقت (هذا الشهر)</h3>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-sm text-gray-600 mb-1">مبلغ الخصم</label>
+                                <input type="number" id="emp-temp-deduct-val" class="w-full border border-orange-300 p-2 rounded outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-600 mb-1">تاريخ نهاية الخصم</label>
+                                <input type="date" id="emp-temp-deduct-date" class="w-full border border-orange-300 p-2 rounded outline-none cursor-pointer">
+                            </div>
+                            <button onclick="window.applyTempDeduction()" class="w-full bg-orange-500 hover:bg-orange-600 text-white py-2 rounded transition font-bold mt-1">تطبيق الخصم</button>
+                        </div>
+                        <div id="active-deduction-info" class="mt-3 text-xs text-red-600 font-bold bg-white p-2 rounded border border-red-200 hide">
+                            <i class="fa-solid fa-circle-exclamation ml-1"></i>خصم فعال: <span id="deduct-display-val" class="mx-1"></span> ينتهي بـ <span id="deduct-display-date" class="mx-1"></span>
+                            <button onclick="window.clearTempDeduction()" class="underline block mt-2 text-gray-500 hover:text-gray-800 w-full text-center">إلغاء الخصم</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- ================= MODALS ================= -->
+    
+    <div id="labModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center hide backdrop-blur-sm">
+        <div class="bg-white rounded-2xl w-11/12 max-w-md p-6 shadow-2xl transform transition-all">
+            <div class="flex justify-between items-center mb-5 border-b pb-2">
+                <h3 class="text-xl font-bold text-blueDark">إضافة مختبر جديد</h3>
+                <button onclick="window.closeModal('labModal')" class="text-gray-400 hover:text-red-500"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-gray-700 mb-1 text-sm font-bold">اسم المختبر</label>
+                    <input type="text" id="new-lab-name" class="w-full border border-sky-300 p-2.5 rounded-lg outline-none focus:border-bluePrimary focus:ring-1 focus:ring-bluePrimary">
+                </div>
+                <div>
+                    <label class="block text-gray-700 mb-1 text-sm font-bold">موقع المختبر</label>
+                    <input type="text" id="new-lab-loc" class="w-full border border-sky-300 p-2.5 rounded-lg outline-none focus:border-bluePrimary focus:ring-1 focus:ring-bluePrimary">
+                </div>
+                <button onclick="window.saveLab()" class="w-full bg-bluePrimary hover:bg-blue-700 text-white py-3 rounded-lg font-bold transition mt-4">حفظ المختبر</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="empModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center hide backdrop-blur-sm">
+        <div class="bg-white rounded-2xl w-11/12 max-w-md p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-5 border-b pb-2">
+                <h3 class="text-xl font-bold text-blueDark">إضافة موظف جديد</h3>
+                <button onclick="window.closeModal('empModal')" class="text-gray-400 hover:text-red-500"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-gray-700 mb-1 text-sm font-bold">اسم الموظف</label>
+                    <input type="text" id="new-emp-name" class="w-full border border-sky-300 p-2.5 rounded-lg outline-none focus:border-bluePrimary focus:ring-1 focus:ring-bluePrimary">
+                </div>
+                <div>
+                    <label class="block text-gray-700 mb-1 text-sm font-bold">الراتب الأساسي</label>
+                    <input type="number" id="new-emp-salary" class="w-full border border-sky-300 p-2.5 rounded-lg outline-none focus:border-bluePrimary focus:ring-1 focus:ring-bluePrimary">
+                </div>
+                <button onclick="window.saveEmployee()" class="w-full bg-bluePrimary hover:bg-blue-700 text-white py-3 rounded-lg font-bold transition mt-4">حفظ الموظف</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="transModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center hide backdrop-blur-sm">
+        <div class="bg-white rounded-2xl w-11/12 max-w-md p-6 shadow-2xl transform transition-all">
+            <div class="flex justify-between items-center mb-5 border-b pb-2">
+                <h3 class="text-xl font-bold text-blueDark">إضافة حركة مالية</h3>
+                <button onclick="window.closeModal('transModal')" class="text-gray-400 hover:text-red-500"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <div class="space-y-5">
+                <div>
+                    <label class="block text-gray-700 mb-2 text-sm font-bold">نوع الحركة</label>
+                    <div class="flex gap-3">
+                        <button id="btn-type-deposit" onclick="window.setTransType('deposit')" class="flex-1 py-3 rounded-lg border-2 border-green-500 bg-green-500 text-white font-bold transition">
+                            <i class="fa-solid fa-arrow-down mr-2"></i> دفع (وارد)
+                        </button>
+                        <button id="btn-type-withdraw" onclick="window.setTransType('withdraw')" class="flex-1 py-3 rounded-lg border-2 border-gray-200 text-gray-600 bg-white hover:bg-gray-50 font-bold transition">
+                            <i class="fa-solid fa-arrow-up mr-2"></i> سحب (مصروف)
+                        </button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-gray-700 mb-1 text-sm font-bold">المبلغ</label>
+                    <input type="number" id="new-trans-amount" class="w-full border border-sky-300 p-2.5 rounded-lg outline-none focus:border-bluePrimary focus:ring-1 focus:ring-bluePrimary">
+                </div>
+                <div>
+                    <label class="block text-gray-700 mb-1 text-sm font-bold">تاريخ الحركة</label>
+                    <input type="date" id="new-trans-date" class="w-full border border-sky-300 p-2.5 rounded-lg outline-none focus:border-bluePrimary focus:ring-1 focus:ring-bluePrimary cursor-pointer">
+                </div>
+                <button onclick="window.saveTransaction()" class="w-full bg-bluePrimary hover:bg-blue-700 text-white py-3 rounded-lg font-bold transition mt-2">حفظ الحركة</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= FIREBASE & JAVASCRIPT LOGIC ================= -->
+    <script type="module">
+        // Firebase Cloud Database Integration
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        let firebaseConfig = {};
+        try { firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}'); } catch(e) {}
+
+        const app = Object.keys(firebaseConfig).length > 0 ? initializeApp(firebaseConfig) : null;
+        const auth = app ? getAuth(app) : null;
+        const db = app ? getFirestore(app) : null;
+
+        let userId = null;
+
+        // Clean Empty State
+        let state = {
+            labs: [],
+            employees: [],
+            currentLabId: null,
+            currentEmpId: null,
+            cashFlow: {
+                labels: ['الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد'],
+                deposits: [0, 0, 0, 0, 0, 0, 0],
+                withdrawals: [0, 0, 0, 0, 0, 0, 0]
+            },
+            activeTransType: 'deposit' 
+        };
+
+        let charts = { mainDaily: null, mainMonthly: null, labDaily: null, labMonthly: null, cashFlow: null };
+
+        Chart.defaults.font.family = "'Tajawal', sans-serif";
+        Chart.defaults.color = '#475569';
+
+        // --- Firebase Database Synchronization ---
+        async function initApp() {
+            if (!auth || !db) {
+                hideLoader();
+                renderDashboard();
+                return;
+            }
+
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Auth error", error);
+                hideLoader();
+            }
+
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    userId = user.uid;
+                    setupRealtimeDatabase();
+                } else {
+                    userId = null;
+                }
+            });
+        }
+
+        function setupRealtimeDatabase() {
+            const docRef = doc(db, 'artifacts', appId, 'users', userId, 'app_state', 'mainData');
+            
+            onSnapshot(docRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    state.labs = data.labs || [];
+                    state.employees = data.employees || [];
+                    state.cashFlow = data.cashFlow || state.cashFlow;
+                }
+                
+                hideLoader();
+                // Render if on dashboard, or update specific view if needed
+                if (!document.getElementById('view-dashboard').classList.contains('hide')) {
+                    renderDashboard();
+                } else if (!document.getElementById('view-lab').classList.contains('hide')) {
+                    const lab = state.labs.find(l => l.id === state.currentLabId);
+                    if(lab) { document.getElementById('lab-status-select').value = lab.status; document.getElementById('lab-time-select').value = lab.time; }
+                } else if (!document.getElementById('view-emp').classList.contains('hide')) {
+                    const emp = state.employees.find(e => e.id === state.currentEmpId);
+                    if(emp) updateEmpViewData(emp);
+                }
+            }, (error) => {
+                console.error("DB Error:", error);
+                hideLoader();
+            });
+        }
+
+        async function syncStateToCloud() {
+            if (!db || !userId) return;
+            const docRef = doc(db, 'artifacts', appId, 'users', userId, 'app_state', 'mainData');
+            try {
+                // Save only the vital data
+                await setDoc(docRef, {
+                    labs: state.labs,
+                    employees: state.employees,
+                    cashFlow: state.cashFlow
+                });
+            } catch(e) { console.error("Sync save error", e); }
+        }
+
+        function hideLoader() {
+            const loader = document.getElementById('loadingOverlay');
+            if(loader) {
+                loader.classList.add('opacity-0', 'pointer-events-none');
+                setTimeout(() => loader.classList.add('hide'), 500);
+            }
+        }
+
+        initApp(); // Start DB connection
+
+        // --- Expose functions to HTML UI ---
+        window.goHome = () => {
+            document.getElementById('view-dashboard').classList.remove('hide');
+            document.getElementById('view-lab').classList.add('hide');
+            document.getElementById('view-emp').classList.add('hide');
+            document.getElementById('header-actions').classList.remove('hide');
+            renderDashboard();
+        };
+
+        window.openModal = (id) => { 
+            document.getElementById(id).classList.remove('hide');
+            if(id === 'labModal'){
+                document.getElementById('new-lab-name').value = '';
+                document.getElementById('new-lab-loc').value = '';
+            } else if (id === 'empModal') {
+                document.getElementById('new-emp-name').value = '';
+                document.getElementById('new-emp-salary').value = '';
+            } else if (id === 'transModal') {
+                document.getElementById('new-trans-amount').value = '';
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('new-trans-date').value = today;
+                window.setTransType('deposit'); 
+            }
+        };
+
+        window.closeModal = (id) => { document.getElementById(id).classList.add('hide'); };
+
+        window.saveLab = () => {
+            const name = document.getElementById('new-lab-name').value.trim();
+            const loc = document.getElementById('new-lab-loc').value.trim();
+            if(!name || !loc) return alert('الرجاء ملء اسم وموقع المختبر');
+            
+            state.labs.push({
+                id: Date.now(), name: name, location: loc, status: 'مفتوح', time: 'ظهر وعصر',
+                daily: [0, 0, 0, 0, 0, 0, 0], monthly: [0, 0, 0, 0, 0, 0]
+            });
+            
+            syncStateToCloud(); // Save to database
+            window.closeModal('labModal');
+            renderDashboard();
+        };
+
+        window.saveEmployee = () => {
+            const name = document.getElementById('new-emp-name').value.trim();
+            const salary = parseInt(document.getElementById('new-emp-salary').value);
+            if(!name || isNaN(salary) || salary <= 0) return alert('الرجاء ملء الاسم وراتب صحيح');
+
+            state.employees.push({
+                id: Date.now(), name: name, baseSalary: salary, tempDeduction: 0, deductionEnd: null
+            });
+
+            syncStateToCloud(); // Save to database
+            window.closeModal('empModal');
+            renderDashboard();
+        };
+
+        window.setTransType = (type) => {
+            state.activeTransType = type;
+            const btnDep = document.getElementById('btn-type-deposit');
+            const btnWith = document.getElementById('btn-type-withdraw');
+            
+            if(type === 'deposit') {
+                btnDep.className = "flex-1 py-3 rounded-lg border-2 border-green-500 bg-green-500 text-white font-bold transition";
+                btnWith.className = "flex-1 py-3 rounded-lg border-2 border-gray-200 text-gray-600 bg-white hover:bg-gray-50 font-bold transition";
+            } else {
+                btnWith.className = "flex-1 py-3 rounded-lg border-2 border-red-500 bg-red-500 text-white font-bold transition";
+                btnDep.className = "flex-1 py-3 rounded-lg border-2 border-gray-200 text-gray-600 bg-white hover:bg-gray-50 font-bold transition";
+            }
+        };
+
+        window.saveTransaction = () => {
+            const amount = parseInt(document.getElementById('new-trans-amount').value);
+            const dateStr = document.getElementById('new-trans-date').value;
+
+            if(isNaN(amount) || amount <= 0) return alert('الرجاء إدخال مبلغ صحيح');
+            if(!dateStr) return alert('الرجاء اختيار التاريخ');
+
+            const dateObj = new Date(dateStr);
+            const jsDay = dateObj.getDay(); 
+            const chartIndex = jsDay === 0 ? 6 : jsDay - 1; 
+
+            if(state.activeTransType === 'deposit') {
+                state.cashFlow.deposits[chartIndex] += amount;
+            } else {
+                state.cashFlow.withdrawals[chartIndex] += amount;
+            }
+
+            syncStateToCloud(); // Save to database
+            window.closeModal('transModal');
+            renderDashboard();
+        };
+
+        window.openLab = (id) => {
+            state.currentLabId = id;
+            const lab = state.labs.find(l => l.id === id);
+            
+            document.getElementById('view-dashboard').classList.add('hide');
+            document.getElementById('header-actions').classList.add('hide');
+            document.getElementById('view-lab').classList.remove('hide');
+
+            document.getElementById('lab-detail-name').innerText = lab.name;
+            document.getElementById('lab-detail-loc').innerHTML = `<i class="fa-solid fa-location-dot ml-1"></i>${lab.location}`;
+            document.getElementById('lab-status-select').value = lab.status;
+            document.getElementById('lab-time-select').value = lab.time;
+
+            drawChart('labDailyChart', 'charts.labDaily', 'الأرباح اليومية', ['الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت','الأحد'], lab.daily, '#2dd4bf');
+            drawChart('labMonthlyChart', 'charts.labMonthly', 'الأرباح الشهرية', ['كانون2','شباط','آذار','نيسان','أيار','حزيران'], lab.monthly, '#fbbf24');
+        };
+
+        window.updateLabSetting = () => {
+            const lab = state.labs.find(l => l.id === state.currentLabId);
+            if(lab) {
+                lab.status = document.getElementById('lab-status-select').value;
+                lab.time = document.getElementById('lab-time-select').value;
+                
+                if(lab.status === 'مغلق' && lab.time !== 'عطلة') {
+                    document.getElementById('lab-time-select').value = 'عطلة';
+                    lab.time = 'عطلة';
+                }
+                if(lab.status === 'مفتوح' && lab.time === 'عطلة') {
+                    document.getElementById('lab-time-select').value = 'ظهر وعصر';
+                    lab.time = 'ظهر وعصر';
+                }
+                syncStateToCloud(); // Save lab settings
+            }
+        };
+
+        window.openEmp = (id) => {
+            state.currentEmpId = id;
+            const emp = state.employees.find(e => e.id === id);
+            
+            document.getElementById('view-dashboard').classList.add('hide');
+            document.getElementById('header-actions').classList.add('hide');
+            document.getElementById('view-emp').classList.remove('hide');
+
+            updateEmpViewData(emp);
+        };
+
+        function updateEmpViewData(emp) {
+            document.getElementById('emp-detail-name').innerText = emp.name;
+            document.getElementById('emp-detail-base').innerText = emp.baseSalary.toLocaleString();
+            document.getElementById('emp-detail-net').innerText = calculateNetSalary(emp).toLocaleString();
+
+            const dedInfo = document.getElementById('active-deduction-info');
+            if(emp.tempDeduction > 0 && isDateFuture(emp.deductionEnd)) {
+                dedInfo.classList.remove('hide');
+                document.getElementById('deduct-display-val').innerText = emp.tempDeduction.toLocaleString();
+                document.getElementById('deduct-display-date').innerText = emp.deductionEnd;
+            } else {
+                dedInfo.classList.add('hide');
+                emp.tempDeduction = 0; 
+                emp.deductionEnd = null;
+            }
+
+            document.getElementById('emp-inc-val').value = '';
+            document.getElementById('emp-dec-val').value = '';
+            document.getElementById('emp-temp-deduct-val').value = '';
+            document.getElementById('emp-temp-deduct-date').value = '';
+        }
+
+        window.adjustSalary = (type) => {
+            const emp = state.employees.find(e => e.id === state.currentEmpId);
+            const valInput = type === 'increase' ? document.getElementById('emp-inc-val') : document.getElementById('emp-dec-val');
+            const val = parseInt(valInput.value);
+
+            if(isNaN(val) || val <= 0) return alert('الرجاء إدخال مبلغ صحيح');
+
+            if(type === 'increase') {
+                emp.baseSalary += val;
+            } else {
+                if(emp.baseSalary - val < 0) return alert('لا يمكن أن يكون الراتب بالسالب');
+                emp.baseSalary -= val;
+            }
+            syncStateToCloud(); // Save to database
+            updateEmpViewData(emp);
+        };
+
+        window.applyTempDeduction = () => {
+            const emp = state.employees.find(e => e.id === state.currentEmpId);
+            const val = parseInt(document.getElementById('emp-temp-deduct-val').value);
+            const dateStr = document.getElementById('emp-temp-deduct-date').value;
+
+            if(isNaN(val) || val <= 0) return alert('الرجاء إدخال مبلغ خصم صحيح');
+            if(!dateStr) return alert('الرجاء تحديد تاريخ نهاية الخصم');
+            if(!isDateFuture(dateStr)) return alert('التاريخ يجب أن يكون في المستقبل');
+
+            emp.tempDeduction = val;
+            emp.deductionEnd = dateStr;
+            syncStateToCloud(); // Save to database
+            updateEmpViewData(emp);
+        };
+
+        window.clearTempDeduction = () => {
+            const emp = state.employees.find(e => e.id === state.currentEmpId);
+            emp.tempDeduction = 0;
+            emp.deductionEnd = null;
+            syncStateToCloud(); // Save to database
+            updateEmpViewData(emp);
+        };
+
+        // Helper functions
+        function calculateNetSalary(emp) {
+            let net = emp.baseSalary;
+            if(emp.tempDeduction > 0 && isDateFuture(emp.deductionEnd)) net -= emp.tempDeduction;
+            return net < 0 ? 0 : net;
+        }
+
+        function isDateFuture(dateStr) {
+            if(!dateStr) return false;
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            return new Date(dateStr) >= today;
+        }
+
+        function renderDashboard() {
+            const labsContainer = document.getElementById('labs-list');
+            labsContainer.innerHTML = '';
+            if(state.labs.length === 0) {
+                labsContainer.innerHTML = '<div class="h-full flex items-center justify-center text-gray-400"><p>لا يوجد مختبرات مضافة.</p></div>';
+            } else {
+                state.labs.forEach(lab => {
+                    const statusColor = lab.status === 'مفتوح' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-red-100 text-red-700 border-red-200';
+                    labsContainer.innerHTML += `
+                        <div onclick="window.openLab(${lab.id})" class="bg-white p-3 rounded-lg shadow-sm border border-sky-100 flex justify-between items-center cursor-pointer hover:shadow-md hover:border-sky-300 transition group">
+                            <div>
+                                <h4 class="font-bold text-blueDark group-hover:text-bluePrimary transition">${lab.name}</h4>
+                                <p class="text-xs text-gray-500 mt-1"><i class="fa-solid fa-location-dot ml-1 text-sky-400"></i>${lab.location}</p>
+                            </div>
+                            <div class="text-xs px-3 py-1 rounded-full border ${statusColor} font-bold">${lab.status}</div>
+                        </div>
+                    `;
+                });
+            }
+
+            const empsContainer = document.getElementById('emps-list');
+            empsContainer.innerHTML = '';
+            if(state.employees.length === 0) {
+                empsContainer.innerHTML = '<div class="h-full flex items-center justify-center text-gray-400"><p>لا يوجد موظفين مضافين.</p></div>';
+            } else {
+                state.employees.forEach(emp => {
+                    const netSalary = calculateNetSalary(emp);
+                    const isDeducted = emp.tempDeduction > 0 && isDateFuture(emp.deductionEnd);
+                    empsContainer.innerHTML += `
+                        <div onclick="window.openEmp(${emp.id})" class="bg-white p-3 rounded-lg shadow-sm border border-sky-100 flex justify-between items-center cursor-pointer hover:shadow-md hover:border-sky-300 transition group">
+                            <div class="flex items-center gap-3">
+                                <div class="bg-skyLight w-10 h-10 rounded-full flex justify-center items-center text-bluePrimary"><i class="fa-solid fa-user"></i></div>
+                                <div>
+                                    <h4 class="font-bold text-blueDark group-hover:text-bluePrimary transition">${emp.name}</h4>
+                                    ${isDeducted ? '<span class="text-[10px] bg-red-100 text-red-600 px-1 rounded mt-1 inline-block">يوجد خصم</span>' : ''}
+                                </div>
+                            </div>
+                            <div class="text-sm font-bold text-gray-700 bg-gray-50 px-2 py-1 rounded border border-gray-100">${netSalary.toLocaleString()}</div>
+                        </div>
+                    `;
+                });
+            }
+
+            document.getElementById('stat-lab-count').innerText = state.labs.length;
+            document.getElementById('stat-emp-count').innerText = state.employees.length;
+            
+            let combinedDaily = [0,0,0,0,0,0,0];
+            let combinedMonthly = [0,0,0,0,0,0];
+
+            state.labs.forEach(lab => {
+                lab.daily.forEach((val, i) => { if(i<7) combinedDaily[i] += val; });
+                lab.monthly.forEach((val, i) => { if(i<6) combinedMonthly[i] += val; });
+            });
+
+            let totalDeposit = state.cashFlow.deposits.reduce((a,b)=>a+b, 0);
+            let totalWithdraw = state.cashFlow.withdrawals.reduce((a,b)=>a+b, 0);
+            document.getElementById('stat-total-deposit').innerText = totalDeposit.toLocaleString();
+            document.getElementById('stat-total-withdraw').innerText = totalWithdraw.toLocaleString();
+
+            drawCashFlowChart();
+            drawChart('mainDailyChart', 'charts.mainDaily', 'إجمالي الأرباح اليومية', ['الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت','الأحد'], combinedDaily, '#38bdf8');
+            drawChart('mainMonthlyChart', 'charts.mainMonthly', 'إجمالي الأرباح الشهرية', ['كانون2','شباط','آذار','نيسان','أيار','حزيران'], combinedMonthly, '#818cf8');
+        }
+
+        function drawCashFlowChart() {
+            const ctx = document.getElementById('cashFlowChart').getContext('2d');
+            if (charts.cashFlow) charts.cashFlow.destroy();
+
+            charts.cashFlow = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: state.cashFlow.labels,
+                    datasets: [
+                        { label: 'دفع (وارد)', data: state.cashFlow.deposits, backgroundColor: '#22c55e', borderRadius: 4, barPercentage: 0.8, categoryPercentage: 0.4 },
+                        { label: 'سحب (مصروف)', data: state.cashFlow.withdrawals, backgroundColor: '#ef4444', borderRadius: 4, barPercentage: 0.8, categoryPercentage: 0.4 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { position: 'top', align: 'end', labels: { font: { family: 'Tajawal', size: 12 }, usePointStyle: true, boxWidth: 8 } },
+                        tooltip: { backgroundColor: 'rgba(15, 23, 42, 0.9)', titleFont: { family: 'Tajawal' }, bodyFont: { family: 'Tajawal' } }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#f1f5f9', drawBorder: false } },
+                        x: { grid: { display: false, drawBorder: false }, stacked: false }
+                    }
+                }
+            });
+        }
+
+        function drawChart(canvasId, chartRefString, label, labels, data, color) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            
+            let targetChart;
+            if(chartRefString === 'charts.mainDaily') targetChart = charts.mainDaily;
+            else if(chartRefString === 'charts.mainMonthly') targetChart = charts.mainMonthly;
+            else if(chartRefString === 'charts.labDaily') targetChart = charts.labDaily;
+            else if(chartRefString === 'charts.labMonthly') targetChart = charts.labMonthly;
+
+            if (targetChart) targetChart.destroy();
+
+            const newChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{ label: label, data: data, backgroundColor: color, borderRadius: 4, barThickness: 'flex', maxBarThickness: 30 }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { backgroundColor: 'rgba(30, 58, 138, 0.9)', titleFont: { family: 'Tajawal' }, bodyFont: { family: 'Tajawal' } }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#f1f5f9', drawBorder: false } },
+                        x: { grid: { display: false, drawBorder: false } }
+                    }
+                }
+            });
+
+            if(chartRefString === 'charts.mainDaily') charts.mainDaily = newChart;
+            else if(chartRefString === 'charts.mainMonthly') charts.mainMonthly = newChart;
+            else if(chartRefString === 'charts.labDaily') charts.labDaily = newChart;
+            else if(chartRefString === 'charts.labMonthly') charts.labMonthly = newChart;
+        }
+    </script>
+</body>
+</html>
+
+
+```
